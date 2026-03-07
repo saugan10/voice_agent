@@ -1,0 +1,751 @@
+openapi: 3.0.3
+info:
+  title: Easy Read API (Complete Workflow)
+  description: |
+    **Production API for Easy Read (v3.1)**
+    
+    **System Workflows Covered:**
+    1. **Auth:** Login/Logout.
+    2. **Admin:** Manage Schools, Users, System Stats.
+    3. **Teacher:** Upload Docs, Edit Content, Assign to Classes, Monitor Analytics.
+    4. **Student:** View Assigned Docs, Read (with AI tools), Play Games, Track Progress.
+    
+    **STRICT RESPONSE CONTRACT:**
+    ```json
+    {
+      "success": true,
+      "message": "Operation successful",
+      "data": { ... },
+      "error": { ... }
+    }
+    ```
+  version: 3.1.0
+  contact:
+    name: Neurakraft Engineering
+    email: dev@neurakraft.com
+
+servers:
+  - url: /api/v1
+    description: Production Server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # --- GLOBAL RESPONSE WRAPPER ---
+    BaseResponse:
+      type: object
+      required: [success, message, data, error]
+      properties:
+        success: 
+          type: boolean
+          description: "True if successful."
+        message: 
+          type: string
+          description: "Status message."
+        data: 
+          type: object
+          nullable: true
+          description: "Success payload."
+        error: 
+          type: object
+          nullable: true
+          description: "Error details."
+
+    # --- ENTITIES ---
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        name: { type: string }
+        role: { type: string, enum: [student, teacher, admin] }
+        status: { type: string, enum: [active, suspended] }
+        avatar_url: { type: string }
+
+    School:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        address: { type: string }
+
+    Classroom:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        code: { type: string }
+        teacher_id: { type: string, format: uuid }
+        student_count: { type: integer }
+
+    Document:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        type: { type: string, enum: [pdf, docx, txt] }
+        difficulty_level: { type: integer }
+        content: { type: string }
+        simplified_content: { type: string }
+        is_simplified: { type: boolean }
+        word_count: { type: integer }
+        icon: { type: string }
+
+    Assignment:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        document_id: { type: string, format: uuid }
+        classroom_id: { type: string, format: uuid }
+        student_id: { type: string, format: uuid }
+        assigned_by: { type: string, format: uuid }
+        due_date: { type: string, format: date }
+        status: { type: string, enum: [assigned, in_progress, completed] }
+
+    UserPreferences:
+      type: object
+      properties:
+        font_size: { type: integer }
+        line_spacing: { type: number }
+        font_family: { type: string }
+        background_color: { type: string }
+        voice_speed: { type: number }
+        chunking_enabled: { type: boolean }
+
+    ActivitySession:
+      type: object
+      properties:
+        student_id: { type: string, format: uuid }
+        activity_type: { type: string }
+        score: { type: integer }
+        duration_seconds: { type: integer }
+
+    MindMap:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        nodes: { type: array, items: { type: object } }
+
+    VoiceProfile:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        rate: { type: number }
+        is_system: { type: boolean }
+
+    WordDefinition:
+      type: object
+      properties:
+        word: { type: string }
+        meaning: { type: string }
+        image_emoji: { type: string }
+
+    AdminStats:
+      type: object
+      properties:
+        total_users: { type: integer }
+        total_documents: { type: integer }
+        active_sessions: { type: integer }
+
+    # --- DATA WRAPPERS (For 'data' field) ---
+    Data_Login: { type: object, properties: { token: { type: string }, user: { $ref: '#/components/schemas/User' } } }
+    Data_List_Users: { type: array, items: { $ref: '#/components/schemas/User' } }
+    Data_List_Docs: { type: array, items: { $ref: '#/components/schemas/Document' } }
+    Data_List_Classes: { type: array, items: { $ref: '#/components/schemas/Classroom' } }
+    Data_List_Assignments: { type: array, items: { $ref: '#/components/schemas/Assignment' } }
+    Data_Stats: { $ref: '#/components/schemas/AdminStats' }
+
+security:
+  - bearerAuth: []
+
+# ---------------------------------------------------------
+# API PATHS
+# ---------------------------------------------------------
+paths:
+
+  # ==========================================
+  # 1. AUTHENTICATION
+  # ==========================================
+  /auth/login:
+    post:
+      summary: User Login
+      description: "Authenticates user and returns session token."
+      tags: [Auth]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/Data_Login' } }
+
+  # ==========================================
+  # 2. DOCUMENT MANAGEMENT (Full Lifecycle)
+  # ==========================================
+  /documents:
+    get:
+      summary: List All Documents
+      description: "Lists documents visible to the user. Teachers see their uploads; Admins see all."
+      tags: [Documents]
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/Data_List_Docs' } }
+    post:
+      summary: Upload Document
+      description: "Uploads a new file (PDF/DOCX) and creates a document record."
+      tags: [Documents]
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, title, difficulty_level]
+              properties:
+                file: { type: string, format: binary }
+                title: { type: string }
+                difficulty_level: { type: integer }
+      responses:
+        '201':
+          description: "Created"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  /documents/{id}:
+    get:
+      summary: Get Document by ID
+      description: "Fetches full details including original content and simplified content."
+      tags: [Documents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/Document' } }
+    patch:
+      summary: Update Document
+      description: "Updates document details, specifically the simplified text (Teacher Editor)."
+      tags: [Documents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                simplified_content: { type: string }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+    delete:
+      summary: Delete Document
+      description: "Permanently removes a document and its assignments."
+      tags: [Documents]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  /documents/{id}/simplify:
+    post:
+      summary: Trigger AI Simplification
+      description: "Uses AI to generate/regenerate simplified content for the document."
+      tags: [AI]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  # ==========================================
+  # 3. STUDENT WORKFLOW (Docs & Assignments)
+  # ==========================================
+  /students/{student_id}/documents:
+    get:
+      summary: Get All Documents for Student
+      description: "Returns a list of Documents that are assigned to the specific student."
+      tags: [Student Workflow]
+      parameters:
+        - name: student_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/Data_List_Docs' } }
+
+  /students/{student_id}/assignments:
+    get:
+      summary: Get Student Assignments
+      description: "Returns the assignment records (due dates, status) for a student."
+      tags: [Student Workflow]
+      parameters:
+        - name: student_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/Data_List_Assignments' } }
+
+  # ==========================================
+  # 4. ASSIGNMENT MANAGEMENT
+  # ==========================================
+  /assignments:
+    post:
+      summary: Create Assignment
+      description: "Assigns a document to a student or classroom."
+      tags: [Assignments]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Assignment' }
+      responses:
+        '201':
+          description: "Created"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  /assignments/{id}:
+    patch:
+      summary: Update Assignment
+      description: "Updates status or due date."
+      tags: [Assignments]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [in_progress, completed] }
+                due_date: { type: string, format: date }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  # ==========================================
+  # 5. CLASSROOMS
+  # ==========================================
+  /schools/{school_id}/classrooms:
+    get:
+      summary: List Classrooms
+      tags: [Classrooms]
+      parameters:
+        - name: school_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/Data_List_Classes' } }
+    post:
+      summary: Create Classroom
+      tags: [Classrooms]
+      parameters:
+        - name: school_id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Classroom' }
+      responses:
+        '201':
+          description: "Created"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  /classrooms/join:
+    post:
+      summary: Join Class via Code
+      tags: [Classrooms]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, student_id]
+              properties:
+                code: { type: string }
+                student_id: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  # ==========================================
+  # 6. USERS & ADMIN
+  # ==========================================
+  /admin/stats:
+    get:
+      summary: Get Admin Stats
+      tags: [Admin]
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/Data_Stats' } }
+
+  /admin/users:
+    get:
+      summary: List Users
+      tags: [Admin]
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/Data_List_Users' } }
+    post:
+      summary: Create User
+      tags: [Admin]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/User' }
+      responses:
+        '201':
+          description: "Created"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  /users/{id}:
+    get:
+      summary: Get User Profile
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/User' } }
+    delete:
+      summary: Delete User
+      tags: [Admin]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  /users/{id}/preferences:
+    get:
+      summary: Get Preferences
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/UserPreferences' } }
+    patch:
+      summary: Update Preferences
+      tags: [Users]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserPreferences' }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  # ==========================================
+  # 7. INTERACTIVE FEATURES
+  # ==========================================
+  /definitions/lookup:
+    get:
+      summary: Word Lookup
+      description: "Gets definition and emoji for a word."
+      tags: [Reader]
+      parameters:
+        - name: word
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/WordDefinition' } }
+
+  /definitions:
+    post:
+      summary: Create Custom Definition
+      tags: [Teacher Tools]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WordDefinition' }
+      responses:
+        '201':
+          description: "Created"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  /sessions/reading:
+    post:
+      summary: Start Reading Session
+      tags: [Tracking]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [student_id, document_id]
+              properties:
+                student_id: { type: string, format: uuid }
+                document_id: { type: string, format: uuid }
+      responses:
+        '201':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties:
+                      data:
+                        type: object
+                        properties: { session_id: { type: string, format: uuid } }
+
+  /sessions/activity:
+    post:
+      summary: Log Game/Activity
+      tags: [Tracking]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ActivitySession' }
+      responses:
+        '201':
+          description: "Success"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  /mindmaps:
+    get:
+      summary: List Mind Maps
+      tags: [Creative]
+      parameters:
+        - name: student_id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/MindMap' }
+    post:
+      summary: Save Mind Map
+      tags: [Creative]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MindMap' }
+      responses:
+        '201':
+          description: "Success"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
+
+  /mindmaps/{id}:
+    get:
+      summary: Get Mind Map
+      tags: [Creative]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { $ref: '#/components/schemas/MindMap' } }
+
+  /voices:
+    get:
+      summary: List Voices
+      tags: [Reader]
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/VoiceProfile' }
+
+  /activities:
+    get:
+      summary: List All Activities
+      tags: [Activities]
+      responses:
+        '200':
+          description: "Success"
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/BaseResponse'
+                  - properties: { data: { type: array, items: { type: object } } }
+
+  /admin/schools:
+    post:
+      summary: Create School
+      tags: [Admin]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/School' }
+      responses:
+        '201':
+          description: "Created"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BaseResponse' }
