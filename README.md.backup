@@ -1,0 +1,310 @@
+# 🎙️ Voice Agent - ElevenLabs AI Voice Applications
+
+A collection of powerful voice AI applications built with ElevenLabs and Google Gemini APIs, featuring text-to-speech, voice cloning, and AI-powered voice chat capabilities.
+
+---
+
+## 📋 Table of Contents
+
+- [Features](#-features)
+- [Project Structure](#-project-structure)
+- [Getting Started](#-getting-started)
+- [Installation](#installation)
+- [Configuration](#-configuration)
+- [Applications](#-applications)
+- [API Keys Setup](#-api-keys-setup)
+- [Usage Examples](#-usage-examples)
+- [Technologies](#️-technologies-used)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+---
+
+## 🌟 Features
+
+This repository contains **four distinct voice AI applications**, each designed for specific use cases:
+
+### 1. 🔊 ElevenLabs Text-to-Speech App (`apps/elevenlabs_tts_app.py`)
+Transform text into natural-sounding speech with multiple voice modulations:
+- **Multiple voices** to choose from
+- **5 Voice modulations:**
+  - 🔊 Default Voice (natural)
+  - 🐢 Slow & Clear (educational, extra slow pace)
+  - 👩‍🏫 Friendly Teacher (warm and encouraging)
+  - 😌 Calm Reader (soothing and relaxed)
+  - ⚡ Energetic Guide (upbeat and engaging)
+- Real-time audio generation and playback
+- Download generated audio files in MP3 format
+- Support for emotion tags ([laughs], [whispers], etc.)
+
+### 2. 🤖 Gemini AI Voice Chat Bot (`apps/gemini_voice_bot.py`)
+An intelligent voice chatbot combining Google Gemini AI with ElevenLabs voice synthesis:
+- Natural language understanding powered by **Gemini 2.5 Flash**
+- Text responses + voice output with adjustable speaking styles
+- Customizable voice selection (use any ElevenLabs voice)
+- Interactive chat interface with conversation history
+- Memory of conversation context across messages
+- Five distinct speaking styles controlled via voice settings (no prompt leakage)
+
+### 3. 🎙️ Voice Cloner (`apps/voice_cloner_app.py`)
+Clone any voice instantly using ElevenLabs Instant Voice Cloning (IVC):
+- Record audio directly in the browser (10-60 seconds recommended)
+- Automatic audio format conversion and validation
+- Create custom voice clones with descriptions
+- Test your cloned voice immediately with custom text
+- Supports multiple audio formats (webm, wav, mp3, ogg, etc.)
+- Built-in ffmpeg integration for audio processing
+
+### 4. 🔁 Gemini Mem0 Voice Bot (`apps/gemini_mem0.py`)
+Advanced voice bot with persistent memory using Pipecat framework:
+- **Real-time voice conversations** via WebRTC/Daily/Twilio
+- Powered by Google Gemini LLM
+- **Mem0 integration** for long-term memory across sessions
+- Deepgram STT (Speech-to-Text)
+- Cartesia TTS (Text-to-Speech)
+- Smart turn detection and VAD (Voice Activity Detection)
+- Scalable architecture for production voice applications
+
+---
+
+## 📁 Project Structure
+
+```
+voice_agent/
+├── 📱 apps/                           # Main applications
+│   ├── elevenlabs_tts_app.py         # Text-to-Speech interface
+│   ├── gemini_voice_bot.py           # AI Voice Chat Bot
+│   ├── voice_cloner_app.py           # Voice Cloning tool
+│   ├── gemini_mem0.py                # Voice Bot with Mem0 memory
+│   └── __init__.py
+│
+├── 🔧 api/                            # API implementations
+│   ├── api.py                        # FastAPI implementation (Easy Read)
+│   ├── api.txt                       # OpenAPI specification
+│   └── __init__.py
+│
+├── 🧪 tests/                          # Test files
+│   ├── test_voices.py                # ElevenLabs voice testing
+│   └── __init__.py
+│
+├── 🛠️ utils/                          # Utility modules
+│   └── __init__.py
+│
+├── 📄 requirements.txt                # Python dependencies
+├── 📖 README.md                       # This file
+├── 🔒 .env.example                    # Environment variables template
+└── 🚫 .gitignore                      # Git ignore rules
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Python 3.8+** (Python 3.10+ recommended)
+- **ElevenLabs API key** → [Get one here](https://elevenlabs.io)
+- **Google Gemini API key** → [Get one here](https://aistudio.google.com/app/apikey)
+- **FFmpeg** (required for voice cloning and audio processing)
+- **Additional APIs** (for `gemini_mem0.py`):
+  - Deepgram API key (Speech-to-Text)
+  - Cartesia API key (Text-to-Speech)
+  - Mem0 API key (optional, for memory features)
+
+### Installation
+
+1. **Clone the repository:**
+```bash
+git clone https://github.com/saugan10/voice_agent.git
+cd voice_agent
+```
+
+2. **Create and activate a virtual environment** (recommended):
+```bash
+# Windows
+python -m venv venv
+venv\Scripts\activate
+
+# macOS/Linux
+python3 -m venv venv
+source venv/bin/activate
+```
+
+3. **Install required dependencies:**
+```bash
+pip install -r requirements.txt
+```
+
+4. **Install FFmpeg** (required for voice cloning):
+   - **Windows (using Chocolatey):**
+     ```bash
+     choco install ffmpeg
+     ```
+   - **Windows (using winget):**
+     ```bash
+     winget install ffmpeg
+     ```
+   - **macOS:**
+     ```bash
+     brew install ffmpeg
+     ```
+   - **Linux (Ubuntu/Debian):**
+     ```bash
+     sudo apt-get update
+     sudo apt-get install ffmpeg
+     ```
+
+5. **Set up environment variables** (optional, for `gemini_mem0.py`):
+   ```bash
+   # Copy the example file
+   cp .env.example .env
+   
+   # Edit .env and add your API keys
+   ```
+
+---
+
+## ⚙️ Configuration
+
+### Option 1: Environment Variables (Recommended for `gemini_mem0.py`)
+
+Create a `.env` file in the root directory:
+
+```bash
+ELEVENLABS_API_KEY=your_elevenlabs_api_key
+GOOGLE_API_KEY=your_google_gemini_api_key
+DEEPGRAM_API_KEY=your_deepgram_api_key    # For gemini_mem0.py
+CARTESIA_API_KEY=your_cartesia_api_key    # For gemini_mem0.py
+MEM0_API_KEY=your_mem0_api_key            # Optional
+```
+
+### Option 2: Enter Keys in App UI (For Streamlit apps)
+
+All Streamlit applications (`apps/elevenlabs_tts_app.py`, `apps/gemini_voice_bot.py`, `apps/voice_cloner_app.py`) allow you to enter API keys directly in the sidebar interface.
+
+---
+
+## 🎯 Applications
+
+### Running the Applications
+
+Navigate to the project root directory and run:
+
+#### 1. Text-to-Speech App
+```bash
+streamlit run apps/elevenlabs_tts_app.py
+```
+
+#### 2. Gemini Voice Chat Bot
+```bash
+streamlit run apps/gemini_voice_bot.py
+```
+
+#### 3. Voice Cloner
+```bash
+streamlit run apps/voice_cloner_app.py
+```
+
+#### 4. Gemini Mem0 Voice Bot (Pipecat-based)
+```bash
+# Via WebRTC (default)
+python apps/gemini_mem0.py
+
+# Via Daily
+python apps/gemini_mem0.py --transport daily
+
+# Via Twilio
+python apps/gemini_mem0.py --transport twilio
+```
+
+Then open your browser to the URL shown in the terminal (typically `http://localhost:8501` for Streamlit apps).
+
+## 🔑 API Keys Setup
+
+1. **ElevenLabs API Key:**
+   - Sign up at [elevenlabs.io](https://elevenlabs.io)
+   - Navigate to your profile settings
+   - Copy your API key
+   - Enter it in the application sidebar
+
+2. **Google Gemini API Key:**
+   - Visit [Google AI Studio](https://aistudio.google.com/app/apikey)
+   - Create a new API key
+   - Copy the key
+   - Enter it in the application sidebar (for Gemini Voice Bot)
+
+⚠️ **Important:** Never commit your API keys to version control. Always enter them through the application interface.
+
+## 📁 Project Structure
+
+```
+voice_agent/
+├── elevenlabs_tts_app.py      # Text-to-speech application
+├── gemini_voice_bot.py         # AI voice chatbot
+├── voice_cloner_app.py         # Voice cloning application
+├── test_voices.py              # Voice testing utility
+├── api.py                      # API reference (Easy Read)
+├── api.txt                     # OpenAPI specification
+├── requirements.txt            # Python dependencies
+├── README.md                   # This file
+└── .gitignore                  # Git ignore rules
+```
+
+## �️ Technologies Used
+
+- **[Streamlit](https://streamlit.io)** - Web application framework
+- **[ElevenLabs](https://elevenlabs.io)** - Voice synthesis and cloning
+- **[Google Gemini](https://ai.google.dev/)** - AI language model
+- **[PyDub](https://github.com/jiaaro/pydub)** - Audio processing
+- **[FFmpeg](https://ffmpeg.org/)** - Audio/video processing
+
+## 📝 Usage Examples
+
+### Text-to-Speech
+1. Enter your ElevenLabs API key in the sidebar
+2. Select a voice from the dropdown
+3. Choose a modulation style (e.g., "Friendly Teacher")
+4. Type or paste your text
+5. Click "Generate Speech" and listen!
+
+### Voice Chat Bot
+1. Enter both API keys (Gemini and ElevenLabs)
+2. Select a voice for responses
+3. Type your message and press Enter
+4. Receive AI-generated text and voice responses
+
+### Voice Cloning
+1. Enter your ElevenLabs API key
+2. Record audio or upload a voice sample
+3. Name your voice clone
+4. Test generation with sample text
+5. Use your cloned voice in other applications!
+
+## ⚠️ Important Notes
+
+- **API Costs:** Both ElevenLabs and Gemini APIs may incur costs based on usage
+- **Voice Quality:** Higher quality voices may require premium ElevenLabs plans
+- **Audio Length:** Voice cloning requires at least a few seconds of clear audio
+- **Rate Limits:** Be aware of API rate limits based on your plan
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## 🙏 Acknowledgments
+
+- [ElevenLabs](https://elevenlabs.io) for amazing voice AI technology
+- [Google Gemini](https://ai.google.dev/) for powerful language models
+- [Streamlit](https://streamlit.io) for the excellent web framework
+
+## 📧 Contact
+
+For questions or support, please open an issue on GitHub.
+
+---
+
+**Made with ❤️ using ElevenLabs and Google Gemini**
